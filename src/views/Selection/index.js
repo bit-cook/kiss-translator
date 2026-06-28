@@ -1,226 +1,81 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
 import TranBtn from "./TranBtn";
 import TranBox from "./TranBox";
-import { shortcutRegister } from "../../libs/shortcut";
-import { sleep, limitNumber } from "../../libs/utils";
-import { isGm, isExt } from "../../libs/client";
-import {
-  MSG_OPEN_TRANBOX,
-  DEFAULT_TRANBOX_SHORTCUT,
-  OPT_TRANBOX_TRIGGER_CLICK,
-  OPT_TRANBOX_TRIGGER_HOVER,
-  OPT_TRANBOX_TRIGGER_SELECT,
-  OPT_DICT_BAIDU,
-} from "../../config";
-import { isMobile } from "../../libs/mobile";
-import { kissLog } from "../../libs/log";
-import { useLangMap } from "../../hooks/I18n";
+import useTranBoxState from "../../hooks/useTranBoxState";
+import useSelectionController from "../../hooks/useSelectionController";
+import useTranboxShortcuts from "../../hooks/useTranboxShortcuts";
 
-export default function Slection({
+/**
+ * 划词翻译交互整体入口组件
+ *
+ * @param {Object} props
+ * @param {string} props.contextMenuType - 浏览器右键菜单的类型/配置
+ * @param {Object} props.tranboxSetting - 划词翻译框的相关设置项
+ * @param {Array} props.transApis - 启用的翻译 API 配置列表
+ * @param {string} props.uiLang - 当前扩展所用的 UI 本地化语言
+ * @param {Object} props.langDetector - 语种检测器的状态配置项
+ */
+export default function Selection({
   contextMenuType,
   tranboxSetting,
   transApis,
+  prompts,
   uiLang,
   langDetector,
 }) {
+  // 1. 初始化并管理划词翻译框（TranBox）的各种展示和交互状态（如宽高、位置、极简模式、点击外部关闭等）
   const {
-    hideTranBtn = false,
-    simpleStyle: initSimpleStyle = false,
-    hideClickAway: initHideClickAway = false,
-    followSelection: initFollowMouse = false,
-    tranboxShortcut = DEFAULT_TRANBOX_SHORTCUT,
-    triggerMode = OPT_TRANBOX_TRIGGER_CLICK,
-    extStyles,
-    btnOffsetX,
-    btnOffsetY,
-    boxOffsetX = 0,
-    boxOffsetY = 10,
-    enDict = OPT_DICT_BAIDU,
-  } = tranboxSetting;
+    boxSize,
+    setBoxSize,
+    boxPosition,
+    setBoxPosition,
+    simpleStyle,
+    setSimpleStyle,
+    hideClickAway,
+    setHideClickAway,
+    followSelection,
+    setFollowSelection,
+    boxOffsetX,
+    boxOffsetY,
+  } = useTranBoxState(tranboxSetting);
 
-  const boxWidth =
-    isMobile || initSimpleStyle
-      ? 300
-      : limitNumber(window.innerWidth, 300, 600);
-  const boxHeight =
-    isMobile || initSimpleStyle
-      ? 200
-      : limitNumber(window.innerHeight, 200, 400);
-
-  const langMap = useLangMap(uiLang);
-  const [showBox, setShowBox] = useState(false);
-  const [showBtn, setShowBtn] = useState(false);
-  const [selectedText, setSelText] = useState("");
-  const [text, setText] = useState("");
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [boxSize, setBoxSize] = useState({
-    w: boxWidth,
-    h: boxHeight,
-  });
-  const [boxPosition, setBoxPosition] = useState({
-    x: (window.innerWidth - boxWidth) / 2,
-    y: (window.innerHeight - boxHeight) / 2,
-  });
-  const [simpleStyle, setSimpleStyle] = useState(initSimpleStyle);
-  const [hideClickAway, setHideClickAway] = useState(initHideClickAway);
-  const [followSelection, setFollowSelection] = useState(initFollowMouse);
-
-  const handleTrigger = useCallback(
-    (text) => {
-      setShowBtn(false);
-      setText(text || selectedText);
-      setShowBox(true);
-    },
-    [selectedText]
-  );
-
-  const handleTranbox = useCallback(() => {
-    setShowBtn(false);
-
-    const selection = window.getSelection();
-    const selectedText = selection?.toString()?.trim() || "";
-    if (!selectedText) {
-      setShowBox((pre) => !pre);
-      return;
-    }
-
-    const rect = selection?.getRangeAt(0)?.getBoundingClientRect();
-    if (rect && followSelection) {
-      const x = (rect.left + rect.right) / 2 + boxOffsetX;
-      const y = rect.bottom + boxOffsetY;
-      setBoxPosition({
-        x: limitNumber(x, 0, window.innerWidth - 300),
-        y: limitNumber(y, 0, window.innerHeight - 200),
-      });
-    }
-
-    setSelText(selectedText);
-    setText(selectedText);
-    setShowBox(true);
-  }, [followSelection, boxOffsetX, boxOffsetY]);
-
-  const btnEvent = useMemo(() => {
-    if (isMobile) {
-      return "onTouchEnd";
-    } else if (triggerMode === OPT_TRANBOX_TRIGGER_HOVER) {
-      return "onMouseOver";
-    }
-    return "onMouseUp";
-  }, [triggerMode]);
-
-  useEffect(() => {
-    async function handleMouseup(e) {
-      e.stopPropagation();
-      await sleep(200);
-
-      const selection = window.getSelection();
-      const selectedText = selection?.toString()?.trim() || "";
-      setSelText(selectedText);
-      if (!selectedText) {
-        setShowBtn(false);
-        return;
-      }
-
-      const rect = selection?.getRangeAt(0)?.getBoundingClientRect();
-      if (rect && followSelection) {
-        const x = (rect.left + rect.right) / 2 + boxOffsetX;
-        const y = rect.bottom + boxOffsetY;
-        setBoxPosition({
-          x: limitNumber(x, 0, window.innerWidth - 300),
-          y: limitNumber(y, 0, window.innerHeight - 200),
-        });
-      }
-
-      if (triggerMode === OPT_TRANBOX_TRIGGER_SELECT) {
-        handleTrigger(selectedText);
-        return;
-      }
-
-      const { clientX, clientY } = isMobile ? e.changedTouches[0] : e;
-      setShowBtn(!hideTranBtn);
-      setPosition({ x: clientX, y: clientY });
-    }
-
-    // todo: mobile support
-    // window.addEventListener("mouseup", handleMouseup);
-    window.addEventListener(isMobile ? "touchend" : "mouseup", handleMouseup);
-    return () => {
-      window.removeEventListener(
-        isMobile ? "touchend" : "mouseup",
-        handleMouseup
-      );
-    };
-  }, [
-    hideTranBtn,
-    triggerMode,
+  // 2. 初始化并绑定全局鼠标划词选区监听器，控制翻译按钮和翻译面板的定位、显示与隐藏
+  const {
+    showBox,
+    setShowBox,
+    showBtn,
+    text,
+    setText,
+    textContext,
+    position,
+    handleOpenTranbox,
+    handleToggleTranbox,
+    btnEvent,
+  } = useSelectionController({
+    tranboxSetting,
     followSelection,
     boxOffsetX,
     boxOffsetY,
-    handleTrigger,
-  ]);
+    boxSize,
+    setBoxPosition,
+    hideClickAway,
+  });
 
-  useEffect(() => {
-    if (isExt) {
-      return;
-    }
-    const clearShortcut = shortcutRegister(tranboxShortcut, handleTranbox);
-    return () => {
-      clearShortcut();
-    };
-  }, [tranboxShortcut, handleTranbox]);
-
-  useEffect(() => {
-    window.addEventListener(MSG_OPEN_TRANBOX, handleTranbox);
-    return () => {
-      window.removeEventListener(MSG_OPEN_TRANBOX, handleTranbox);
-    };
-  }, [handleTranbox]);
-
-  useEffect(() => {
-    if (!isGm) {
-      return;
-    }
-
-    // 注册菜单
-    try {
-      const menuCommandIds = [];
-      contextMenuType !== 0 &&
-        menuCommandIds.push(
-          GM.registerMenuCommand(
-            langMap("translate_selected_text"),
-            (event) => {
-              handleTranbox();
-            },
-            "S"
-          )
-        );
-
-      return () => {
-        menuCommandIds.forEach((id) => {
-          GM.unregisterMenuCommand(id);
-        });
-      };
-    } catch (err) {
-      kissLog(err, "registerMenuCommand");
-    }
-  }, [handleTranbox, contextMenuType, langMap]);
-
-  useEffect(() => {
-    if (hideClickAway) {
-      const handleHideBox = () => {
-        setShowBox(false);
-      };
-      window.addEventListener("click", handleHideBox);
-      return () => {
-        window.removeEventListener("click", handleHideBox);
-      };
-    }
-  }, [hideClickAway]);
+  // 3. 注册并侦听划词框专属的全局键盘快捷键 (如 Esc 关闭，特定键拉起等)
+  useTranboxShortcuts({
+    showBox,
+    setShowBox,
+    handleOpenTranbox,
+    handleToggleTranbox,
+    contextMenuType,
+    uiLang,
+  });
 
   return (
     <>
-      {showBox && (
+      {/* 渲染可拖拽拉伸的划词翻译面板 */}
+      {
         <TranBox
+          showBox={showBox}
           text={text}
           setText={setText}
           boxSize={boxSize}
@@ -229,6 +84,7 @@ export default function Slection({
           setBoxPosition={setBoxPosition}
           tranboxSetting={tranboxSetting}
           transApis={transApis}
+          prompts={prompts}
           setShowBox={setShowBox}
           simpleStyle={simpleStyle}
           setSimpleStyle={setSimpleStyle}
@@ -236,21 +92,22 @@ export default function Slection({
           setHideClickAway={setHideClickAway}
           followSelection={followSelection}
           setFollowSelection={setFollowSelection}
-          extStyles={extStyles}
+          // extStyles={extStyles}
           langDetector={langDetector}
-          enDict={enDict}
+          selectionContext={textContext}
         />
-      )}
+      }
 
+      {/* 当有划词选区时，在选区旁渲染悬浮的蓝色翻译触发按钮 */}
       {showBtn && (
         <TranBtn
           position={position}
-          btnOffsetX={btnOffsetX}
-          btnOffsetY={btnOffsetY}
+          btnOffsetX={tranboxSetting.btnOffsetX}
+          btnOffsetY={tranboxSetting.btnOffsetY}
           btnEvent={btnEvent}
           onTrigger={(e) => {
             e.stopPropagation();
-            handleTrigger();
+            handleOpenTranbox();
           }}
         />
       )}

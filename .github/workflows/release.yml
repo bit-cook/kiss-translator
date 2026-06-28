@@ -7,28 +7,28 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
         with:
-          version: 8.7.6
-      - uses: actions/setup-node@v3
+          version: 9.14.4
+      - uses: actions/setup-node@v4
         with:
-          node-version: "18.17.0"
+          node-version: 24
           cache: "pnpm"
       - run: pnpm install
-      - run: pnpm build
-      - uses: actions/upload-artifact@v3
+      - run: pnpm build+zip
+      - uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
           path: build
   deploy-web:
     needs: build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
           name: build-artifacts
           path: build
@@ -37,10 +37,33 @@ jobs:
         with:
           folder: build/web
   create-release:
-    runs-on: ubuntu-22.04
+    needs: build
+    runs-on: ubuntu-24.04
     outputs:
       upload_url: ${{ steps.create-release.outputs.upload_url }}
     steps:
+      - uses: actions/checkout@v4
+      - name: Extract Release Notes
+        id: extract_notes
+        shell: bash
+        run: |
+          LOG_FILE="CHANGELOG.md"
+          
+          if [ -f "$LOG_FILE" ]; then
+            # 使用 awk 提取：从第一个 "## " 后面开始，直到遇到下一个 "## " 停止
+            # 这里的逻辑假设最新日志在文件最上方
+            NOTES=$(awk '/^## / {if (p) exit; p=1; next} p' "$LOG_FILE")
+          else
+            NOTES="Release ${{ github.ref }}"
+          fi
+          
+          # 处理多行文本并写入 GITHUB_OUTPUT
+          {
+            echo "body<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: actions/create-release@v1
         id: create-release
         env:
@@ -48,24 +71,21 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           release_name: Release ${{ github.ref }}
+          body: ${{ steps.extract_notes.outputs.body }}
           draft: false
           prerelease: false
   upload-release:
     needs: [build, create-release]
     strategy:
       matrix:
-        client: ["chrome", "edge", "firefox", "userscript"]
-    runs-on: ubuntu-22.04
+        client: ["chrome", "edge", "firefox", "userscript", "thunderbird"]
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
           name: build-artifacts
           path: build
-      - name: Zip Release
-        run: |
-          cd build
-          zip -r ${{ matrix.client }}.zip ${{ matrix.client }}
       - uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,16 +1,19 @@
 {
   "name": "kiss-translator",
   "description": "A minimalist bilingual translation Extension & Greasemonkey Script",
-  "version": "1.8.11",
+  "version": "2.0.28",
   "author": "Gabe<yugang2002@gmail.com>",
   "private": true,
   "dependencies": {
     "@emotion/cache": "^11.11.0",
+    "@emotion/css": "^11.13.5",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.15",
     "@mui/lab": "5.0.0-alpha.170",
     "@mui/material": "^5.15.15",
+    "@streamparser/json": "^0.0.22",
+    "dompurify": "^3.4.0",
     "query-string": "^8.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -22,17 +25,26 @@
     "webextension-polyfill": "^0.10.0"
   },
   "scripts": {
-    "start": "REACT_APP_CLIENT=web react-app-rewired start",
-    "start:userscript": "REACT_APP_CLIENT=userscript react-app-rewired start",
-    "build:chrome": "rm -rf build/chrome && BUILD_PATH=./build/chrome REACT_APP_CLIENT=chrome react-app-rewired build && rm build/chrome/content.html",
-    "build:edge": "rm -rf build/edge && cp -r build/chrome build/edge",
-    "build:firefox": "rm -rf build/firefox && cp -r build/chrome build/firefox && cat ./build/firefox/manifest.firefox.json > ./build/firefox/manifest.json && rm build/*/manifest.firefox.json",
-    "build:web": "rm -rf build/web && BUILD_PATH=./build/web REACT_APP_CLIENT=userscript react-app-rewired build",
-    "build:userscript-ios": "file1=build/web/kiss-translator.user.js file2=build/web/kiss-translator-ios-safari.user.js && cp $file1 $file2 && sed -i 's|// @grant         unsafeWindow|// @inject-into   content|g' $file2",
-    "build:userscript": "rm -rf build/userscript && mkdir build/userscript && cp build/web/*.user.js build/userscript/",
+    "start": "cross-env REACT_APP_CLIENT=web react-app-rewired start",
+    "start:userscript": "cross-env REACT_APP_CLIENT=userscript react-app-rewired start",
+    "sync-version": "zx src/scripts/sync-version.mjs",
+    "version:patch": "zx src/scripts/update-version.mjs patch",
+    "version:minor": "zx src/scripts/update-version.mjs minor",
+    "version:major": "zx src/scripts/update-version.mjs major",
+    "version:set": "zx src/scripts/update-version.mjs set",
+    "build:chrome": "zx src/scripts/build-task.mjs --target=chrome",
+    "build:edge": "zx src/scripts/build-task.mjs --target=edge",
+    "build:safari-output": "zx src/scripts/build-task.mjs --target=safari",
+    "build:thunderbird": "zx src/scripts/build-task.mjs --target=thunderbird",
+    "build:firefox": "zx src/scripts/build-task.mjs --target=firefox",
+    "build:web": "zx src/scripts/build-task.mjs --target=web",
+    "build:safari": "node src/scripts/build-safari.mjs",
+    "build:userscript-ios": "zx src/scripts/build-ios.mjs",
     "build:rules": "babel-node src/rules.js",
-    "build": "pnpm build:chrome && pnpm build:edge && pnpm build:firefox && pnpm build:web && pnpm build:userscript-ios && pnpm build:userscript && pnpm build:rules",
-    "zip": "cd build && zip -r chrome.zip chrome && zip -r edge.zip edge && cd firefox && zip -r ../firefox.zip .",
+    "format": "prettier --write \"**/*.{js,json,html}\"",
+    "build": "pnpm sync-version && pnpm format && pnpm build:chrome && pnpm build:edge && pnpm build:thunderbird && pnpm build:firefox && pnpm build:web && pnpm build:userscript-ios && pnpm build:rules",
+    "zip": "zx src/scripts/archive.mjs",
+    "build+zip": "cross-env CI=true pnpm build && pnpm zip",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject"
   },
@@ -44,7 +56,10 @@
     "globals": {
       "GM": true,
       "unsafeWindow": true,
-      "globalThis": true
+      "globalThis": true,
+      "messenger": true,
+      "LanguageDetector": true,
+      "Translator": true
     }
   },
   "browserslist": {
@@ -64,6 +79,12 @@
     "@babel/node": "^7.22.19",
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@babel/preset-env": "^7.22.20",
-    "react-app-rewired": "^2.2.1"
+    "bestzip": "^2.2.1",
+    "cross-env": "^7.0.3",
+    "dotenv": "^17.2.1",
+    "find-up": "^7.0.0",
+    "prettier": "3.6.2",
+    "react-app-rewired": "^2.2.1",
+    "zx": "^8.8.1"
   }
 }
