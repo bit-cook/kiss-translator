@@ -3,18 +3,30 @@
     "message": "KISS Translator"
   },
   "app_description": {
-    "message": "A simple bilingual translation extension & Greasemonkey script"
+    "message": "A minimalist bilingual translation extension that supports webpage, text selection, and video subtitle translation."
+  },
+  "translate_selection": {
+    "message": "Translate \"%s\""
   },
   "toggle_translate": {
-    "message": "Toggle Translate"
+    "message": "Toggle Translation"
+  },
+  "toggle_translate_only": {
+    "message": "Show translation only"
   },
   "toggle_style": {
-    "message": "Toggle Style"
+    "message": "Toggle Styles"
   },
   "open_options": {
-    "message": "Open Options"
+    "message": "Open Setting"
   },
   "open_tranbox": {
-    "message": "Translate Popup/Selected"
+    "message": "Open Popup Box"
+  },
+  "open_separate_window": {
+    "message": "Open Independent Window"
+  },
+  "toggle_tranbox": {
+    "message": "Toggle Translation Box"
   }
 }
